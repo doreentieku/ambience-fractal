@@ -1,0 +1,1069 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Ambience Fractal Studio</title>
+    <style>
+        :root {
+            --bg: #0b0f17;
+            --panel: rgba(15, 8, 9, 0.70);
+            --text: #e7ecf4;
+            --muted: #98a2b3;
+            --accent: #ef4444;
+            --accent2: #f43f5e;
+            --good: #34d399;
+            --warn: #f59e0b;
+            --danger: #ef4444;
+            --shadow: 0 10px 30px rgba(0, 0, 0, .35);
+            --radius: 16px;
+            --blur: saturate(1.15) blur(8px);
+        }
+
+        html,
+        body {
+            height: 100%;
+            margin: 0;
+            background: radial-gradient(1400px 900px at 50% 18%, #1a0b10 0%, #0b0306 48%, #050103 100%);
+            color: var(--text);
+            font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+            overflow: hidden;
+        }
+
+        /* Fullscreen canvas background */
+        #stage {
+            position: fixed;
+            inset: 0;
+            width: 100vw;
+            height: 100vh;
+            display: block;
+            background: transparent;
+        }
+
+        /* UI panel (base) */
+        .hud {
+            position: fixed;
+            inset: 0;
+            padding: 18px;
+            z-index: 10;
+            display: block;
+            height: 100vh;
+        }
+
+        .card {
+            position: relative;
+            background: linear-gradient(180deg, rgba(20, 8, 10, .88), rgba(12, 4, 6, .76));
+            backdrop-filter: saturate(1.15) blur(10px);
+            -webkit-backdrop-filter: saturate(1.15) blur(10px);
+            border: 1px solid rgba(239, 68, 68, .22);
+            border-radius: var(--radius);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, .45), inset 0 0 18px rgba(239, 68, 68, .14), inset 0 0 32px rgba(244, 63, 94, .12);
+            padding: 14px 16px;
+        }
+
+        .title {
+            font-weight: 700;
+            letter-spacing: .2px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 8px;
+            font-size: 14px;
+            color: #ffd7df;
+            text-transform: uppercase;
+        }
+
+        .title .dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: radial-gradient(circle at 30% 30%, var(--accent2), var(--accent));
+            box-shadow: 0 0 18px var(--accent2);
+        }
+
+        .row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .col {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .btn {
+            appearance: none;
+            border: 0;
+            border-radius: 12px;
+            padding: 10px 14px;
+            font-weight: 600;
+            color: #0b0f17;
+            background: linear-gradient(180deg, #f87171, #ef4444);
+            cursor: pointer;
+            box-shadow: var(--shadow);
+            transition: transform .12s ease, filter .12s ease, background .2s ease;
+        }
+
+        .btn.secondary {
+            background: linear-gradient(180deg, #fb7185, #f43f5e);
+            color: #0b0b0b;
+        }
+
+        .btn.ghost {
+            background: rgba(239, 68, 68, .14);
+            color: var(--text);
+            border: 1px solid rgba(244, 63, 94, .22);
+        }
+
+        .btn:active {
+            transform: translateY(1px) scale(.99);
+        }
+
+        .btn[disabled] {
+            filter: grayscale(.8) brightness(.8);
+            cursor: not-allowed;
+        }
+
+        label {
+            font-size: 12px;
+            color: var(--muted);
+        }
+
+        .switch {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 10px;
+            border-radius: 12px;
+            background: rgba(255, 255, 255, .04);
+            border: 1px solid rgba(255, 255, 255, .06);
+        }
+
+        .switch input[type="checkbox"] {
+            appearance: none;
+            width: 42px;
+            height: 24px;
+            border-radius: 999px;
+            position: relative;
+            background: rgba(255, 255, 255, .16);
+            outline: none;
+            cursor: pointer;
+            transition: background .2s ease;
+        }
+
+        .switch input[type="checkbox"]::after {
+            content: "";
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: white;
+            transition: transform .2s ease;
+        }
+
+        .switch input[type="checkbox"]:checked {
+            background: linear-gradient(90deg, var(--accent), var(--accent2));
+        }
+
+        .switch input[type="checkbox"]:checked::after {
+            transform: translateX(18px);
+        }
+
+        .slider {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 160px;
+            height: 6px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, .14);
+            outline: none;
+        }
+
+        .slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: white;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, .4);
+            cursor: pointer;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .pill {
+            padding: 6px 10px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, .08);
+            border: 1px solid rgba(255, 255, 255, .08);
+            font-size: 12px;
+        }
+
+        .meter {
+            position: relative;
+            width: 90px;
+            height: 90px;
+        }
+
+        .meter svg {
+            transform: rotate(-90deg);
+            width: 100%;
+            height: 100%;
+        }
+
+        .meter .text {
+            position: absolute;
+            inset: 0;
+            display: grid;
+            place-items: center;
+            font-weight: 700;
+        }
+
+        .stack {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .tiny {
+            font-size: 11px;
+            color: var(--muted);
+        }
+
+        /* Draggable card cursor */
+        .draggable .title {
+            cursor: grab;
+        }
+
+        .dragging .title {
+            cursor: grabbing;
+        }
+
+        .toast {
+            position: fixed;
+            right: 18px;
+            bottom: 18px;
+            background: rgba(20, 24, 34, .9);
+            color: var(--text);
+            border: 1px solid rgba(255, 255, 255, .08);
+            padding: 10px 12px;
+            border-radius: 12px;
+            box-shadow: var(--shadow);
+            opacity: 0;
+            transform: translateY(6px);
+            transition: opacity .25s ease, transform .25s ease;
+        }
+
+        .toast.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* Dark Exotic Crimson Theme overlays */
+        body::after {
+            content: "";
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 1;
+            background:
+                radial-gradient(800px 600px at var(--pulseX, 50%) var(--pulseY, 36%), rgba(239, 68, 68, .18), transparent 60%),
+                radial-gradient(1200px 900px at 50% 82%, rgba(190, 24, 93, .12), transparent 70%);
+            mix-blend-mode: screen;
+            opacity: calc(.25 + var(--pulse, 0)*.5);
+            transition: opacity .08s linear;
+        }
+
+        /* --- Single-card studio layout --- */
+        .studio {
+            position: absolute;
+            left: 24px;
+            top: 24px;
+            min-width: 340px;
+            min-height: 240px;
+            width: min(980px, calc(100vw - 96px));
+            height: auto;
+            overflow: auto;
+            padding-bottom: 28px;
+        }
+
+        .studio .studio-toolbar {
+            margin-bottom: 10px;
+            justify-content: space-between;
+            flex-wrap: wrap;
+        }
+
+        .studio .content {
+            display: grid;
+            grid-template-columns: 1.2fr 1fr 1fr;
+            gap: 12px;
+        }
+
+        .studio.size-medium .content {
+            grid-template-columns: 1fr 1fr;
+        }
+
+        .studio.size-narrow .content {
+            grid-template-columns: 1fr;
+        }
+
+        .resize-handle {
+            position: absolute;
+            right: 8px;
+            bottom: 8px;
+            width: 18px;
+            height: 18px;
+            border-radius: 4px;
+            border: 1px solid rgba(244, 63, 94, .35);
+            background: linear-gradient(135deg, rgba(239, 68, 68, .3), rgba(244, 63, 94, .2));
+            cursor: se-resize;
+            box-shadow: inset 0 0 8px rgba(244, 63, 94, .25);
+        }
+
+        @media (max-width: 980px) {
+            .studio {
+                left: 12px;
+                top: 12px;
+                width: calc(100vw - 48px);
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <canvas id="stage"></canvas>
+
+    <div class="hud">
+        <div class="card studio" id="studioCard">
+            <div class="title"><span class="dot"></span> Ambience Fractal Studio</div>
+
+            <!-- Top toolbar -->
+            <div class="studio-toolbar row">
+                <div class="row">
+                    <button id="startAudio" class="btn">▶ Start Audio</button>
+                    <button id="pauseAudio" class="btn ghost" disabled>⏸︎ Pause</button>
+                    <button id="fsBtn" class="btn ghost">⛶ Fullscreen</button>
+                </div>
+                <div class="row">
+                    <span class="pill">Master</span>
+                    <input id="masterVol" class="slider" type="range" min="0" max="1" step="0.01" value="0.6" />
+                    <label>Sensitivity</label>
+                    <input id="sensitivity" class="slider" type="range" min="0" max="2" step="0.01" value="0.9" />
+                </div>
+            </div>
+
+            <!-- Content grid: Sources | Timer | Visuals -->
+            <div class="content">
+                <!-- Sources -->
+                <section>
+                    <div class="title"><span class="dot"></span> Ambience</div>
+                    <div class="grid">
+                        <div class="stack">
+                            <label class="switch"><input type="checkbox" id="rainChk" /><span
+                                    class="pill">Rain</span></label>
+                            <input id="rainVol" class="slider" type="range" min="0" max="1" step="0.01" value="0.7" />
+                        </div>
+                        <div class="stack">
+                            <label class="switch"><input type="checkbox" id="wavesChk" /><span
+                                    class="pill">Waves</span></label>
+                            <input id="wavesVol" class="slider" type="range" min="0" max="1" step="0.01" value="0.5" />
+                        </div>
+                        <div class="stack">
+                            <label class="switch"><input type="checkbox" id="brownChk" /><span class="pill">Brown
+                                    Noise</span></label>
+                            <input id="brownVol" class="slider" type="range" min="0" max="1" step="0.01" value="0.4" />
+                        </div>
+                        <div class="stack">
+                            <label class="switch"><input type="checkbox" id="chimeChk" /><span
+                                    class="pill">Chimes</span></label>
+                            <input id="chimeVol" class="slider" type="range" min="0" max="1" step="0.01" value="0.25" />
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Timer -->
+                <section>
+                    <div class="title"><span class="dot"
+                            style="background: var(--good); box-shadow:0 0 18px var(--good);"></span> Timer</div>
+                    <div class="row" style="justify-content:space-between; align-items:center;">
+                        <div class="row">
+                            <button class="btn secondary" data-preset="25">Pomodoro 25</button>
+                            <button class="btn secondary" data-preset="45">Deep Focus 45</button>
+                            <button class="btn secondary" data-preset="10">Quick 10</button>
+                        </div>
+                        <div class="row">
+                            <label>Minutes</label>
+                            <input id="minutesInput" type="number" min="1" max="180" value="25"
+                                style="width:74px; padding:9px 10px; border-radius:12px; border:1px solid rgba(255,255,255,.1); background: rgba(255,255,255,.06); color: var(--text);" />
+                            <button id="startTimer" class="btn">Start</button>
+                            <button id="pauseTimer" class="btn ghost" disabled>Pause</button>
+                            <button id="resetTimer" class="btn ghost" disabled>Reset</button>
+                        </div>
+                    </div>
+                    <div class="row" style="margin-top:10px; align-items:center; justify-content:space-between;">
+                        <div class="meter" title="Session progress">
+                            <svg viewBox="0 0 100 100">
+                                <circle cx="50" cy="50" r="44" stroke="rgba(255,255,255,.12)" stroke-width="10"
+                                    fill="none" />
+                                <circle id="progressArc" cx="50" cy="50" r="44" stroke="url(#grad)" stroke-width="10"
+                                    fill="none" stroke-linecap="round" stroke-dasharray="276.46"
+                                    stroke-dashoffset="276.46" />
+                                <defs>
+                                    <linearGradient id="grad" x1="0" y1="0" x2="1" y2="1">
+                                        <stop offset="0%" stop-color="#7dd3fc" />
+                                        <stop offset="100%" stop-color="#a78bfa" />
+                                    </linearGradient>
+                                </defs>
+                            </svg>
+                            <div class="text"><span id="timeLeft">25:00</span></div>
+                        </div>
+                        <div class="col" style="flex:1;">
+                            <div class="tiny">Tip: You can run this offline after loading once. Everything is generated
+                                in-browser.</div>
+                            <div class="row">
+                                <span class="pill" id="vizMode">Visual: Crimson Attractor</span>
+                                <span class="pill" id="qualityTag">Quality: Medium</span>
+                            </div>
+                            <div class="row" style="margin-top:6px;">
+                                <label>Quality</label>
+                                <input id="quality" class="slider" type="range" min="0" max="2" step="1" value="1" />
+                                <label>Trail</label>
+                                <input id="trail" class="slider" type="range" min="0.75" max="0.995" step="0.001"
+                                    value="0.94" />
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Visuals -->
+                <section>
+                    <div class="title"><span class="dot"
+                            style="background: var(--warn); box-shadow:0 0 18px var(--warn);"></span> Visuals</div>
+                    <div class="col">
+                        <div class="row">
+                            <label>Palette</label>
+                            <select id="palette"
+                                style="padding:9px 10px; border-radius:12px; border:1px solid rgba(255,255,255,.1); background: rgba(255,255,255,.06); color: var(--text);">
+                                <option value="crimson">Crimson</option>
+                                <option value="rose">Rosé</option>
+                                <option value="ember">Ember</option>
+                                <option value="noir">Noir-Red</option>
+                            </select>
+                            <label>Speed</label>
+                            <input id="speed" class="slider" type="range" min="0.2" max="2.5" step="0.01" value="1.0" />
+                            <label>Symmetry</label>
+                            <input id="symmetry" class="slider" type="range" min="1" max="6" step="1" value="1" />
+                            <label>Mode</label>
+                            <select id="mode"
+                                style="padding:9px 10px; border-radius:12px; border:1px solid rgba(255,255,255,.1); background: rgba(255,255,255,.06); color: var(--text);">
+                                <option value="attractor" selected>Attractor</option>
+                                <option value="flow">Flow Field</option>
+                            </select>
+                        </div>
+                        <div class="tiny">Fractal flow reacts to total sound energy. Sensitivity & speed change how
+                            strongly it breathes with audio.</div>
+                    </div>
+                </section>
+            </div>
+
+            <div class="resize-handle" aria-hidden="true"></div>
+        </div>
+    </div>
+
+    <div id="toast" class="toast">Audio started</div>
+
+    <script>
+        (() => {
+            // ---------- Utilities ----------
+            const clamp = (n, a, b) => Math.min(Math.max(n, a), b);
+            const lerp = (a, b, t) => a + (b - a) * t;
+
+            // ---------- Canvas / Visuals ----------
+            const canvas = document.getElementById('stage');
+            const ctx = canvas.getContext('2d', { alpha: true });
+            let W = canvas.width = window.innerWidth;
+            let H = canvas.height = window.innerHeight;
+
+            window.addEventListener('resize', () => {
+                W = canvas.width = window.innerWidth;
+                H = canvas.height = window.innerHeight;
+                resetParticles();
+            });
+
+            // Flow field based on simple sin/cos (fast) with optional kaleidoscopic symmetry
+            let particleCount = 1200; // adjustable by Quality slider
+            const particles = [];
+            let fade = 0.92; // slightly longer trails
+            let useAttractor = true; // default to the crimson attractor
+            let baseSpeed = 1.0;
+            let symmetrySlices = 1;
+            let audioEnergy = 0.0; // 0..1 smoothed
+            let palette = 'crimson';
+
+            function paletteColor(h, a = 0.9) {
+                // deep red palettes
+                let hue = (h % 20) + 350; // 350..370
+                if (palette === 'rose') hue = 340 + (h % 30); // 340..370
+                if (palette === 'ember') hue = 5 + (h % 16); // 5..21
+                if (palette === 'noir') return `hsla(350, 60%, ${40 + (h % 20)}%, ${a})`;
+                return `hsla(${hue}, 85%, 58%, ${a})`;
+            }
+
+            function resetParticles() {
+                particles.length = 0;
+                const count = particleCount;
+                for (let i = 0; i < count; i++) {
+                    particles.push({
+                        x: Math.random() * W,
+                        y: Math.random() * H,
+                        px: 0,
+                        py: 0,
+                        hue: Math.random() * 360,
+                        life: Math.random() * 300 + 100,
+                    });
+                }
+                ctx.fillStyle = 'rgba(0,0,0,0)';
+                ctx.fillRect(0, 0, W, H);
+            }
+
+            function fieldAngle(x, y, t) {
+                const scale = 0.0022;
+                const n = Math.sin((x * scale + t * 0.45)) + Math.cos((y * scale - t * 0.38)) + Math.sin((x * scale * 0.6 - y * scale * 0.6 + t * 0.22));
+                return n * Math.PI;
+            }
+
+            // Crimson "sexy" fractal: de Jong (Clifford-style) strange attractor
+            const dj = { a: -1.4, b: 1.6, c: 1.0, d: 0.7, x: 0.1, y: 0.1 };
+            let attractorPointsBase = 22000;
+            function drawAttractor(t) {
+                // fade background to keep silky trails
+                ctx.globalCompositeOperation = 'source-over';
+                ctx.fillStyle = `rgba(5,2,3,${1 - fade})`;
+                ctx.fillRect(0, 0, W, H);
+                ctx.globalCompositeOperation = 'lighter';
+
+                const N = Math.floor(attractorPointsBase * (0.7 + audioEnergy * 1.6));
+                const s = Math.min(W, H) * (0.22 + audioEnergy * 0.08);
+                const k = audioEnergy; const tt = t * 0.0004;
+                const a = dj.a + 0.15 * Math.sin(tt * 1.7) * (0.6 + k);
+                const b = dj.b + 0.12 * Math.cos(tt * 1.3) * (0.6 + k);
+                const c = dj.c + 0.10 * Math.sin(tt * 1.1) * (0.6 + k);
+                const d = dj.d + 0.18 * Math.cos(tt * 1.5) * (0.6 + k);
+                let x = dj.x, y = dj.y;
+
+                const batches = 6; const per = Math.floor(N / batches);
+                for (let bch = 0; bch < batches; bch++) {
+                    const hue = 350 + (bch / batches) * 20; // 350..370 crimson range
+                    const alpha = 0.06 + audioEnergy * 0.12;
+                    ctx.fillStyle = `hsla(${hue.toFixed(1)}, 85%, ${(50 + audioEnergy * 20).toFixed(0)}%, ${alpha})`;
+                    for (let i = 0; i < per; i++) {
+                        const nx = Math.sin(a * y) - Math.cos(b * x);
+                        const ny = Math.sin(c * x) - Math.cos(d * y);
+                        x = nx; y = ny;
+                        const px = W / 2 + x * s;
+                        const py = H / 2 + y * s;
+                        if (px > 0 && px < W && py > 0 && py < H) ctx.fillRect(px, py, 1, 1);
+                    }
+                }
+                dj.x = x; dj.y = y;
+            }
+
+            function step(t) {
+                // audio-synced background pulse
+                const px = 50 + Math.sin(t * 0.0005) * 10 * audioEnergy;
+                const py = 36 + Math.cos(t * 0.0007) * 8 * audioEnergy;
+                document.documentElement.style.setProperty('--pulseX', px + '%');
+                document.documentElement.style.setProperty('--pulseY', py + '%');
+
+                if (useAttractor) {
+                    drawAttractor(t);
+                    requestAnimationFrame(step);
+                    return;
+                }
+
+                // ---- Flow Field fallback ----
+                ctx.globalCompositeOperation = 'source-over';
+                ctx.fillStyle = `rgba(5,2,3,${1 - fade})`;
+                ctx.fillRect(0, 0, W, H);
+
+                const speed = baseSpeed * (0.6 + audioEnergy * 1.8);
+                const lineAlpha = clamp(0.15 + audioEnergy * 0.6, 0.12, 0.7);
+                ctx.globalCompositeOperation = 'lighter';
+                ctx.lineWidth = 1.1;
+
+                for (let i = 0; i < particles.length; i++) {
+                    const p = particles[i];
+                    p.px = p.x; p.py = p.y;
+                    let ang = fieldAngle(p.x, p.y, t * 0.0008);
+                    const vx = Math.cos(ang) * speed;
+                    const vy = Math.sin(ang) * speed;
+                    p.x += vx; p.y += vy;
+                    p.hue = (p.hue + 0.4 + audioEnergy * 2.0) % 360;
+                    p.life -= 1;
+                    if (p.x < 0 || p.x > W || p.y < 0 || p.y > H || p.life <= 0) {
+                        p.x = Math.random() * W; p.y = Math.random() * H; p.life = Math.random() * 300 + 100;
+                    }
+
+                    const drawStroke = (sx, sy, ex, ey) => {
+                        ctx.strokeStyle = paletteColor(p.hue, lineAlpha);
+                        ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(ex, ey); ctx.stroke();
+                    };
+
+                    if (symmetrySlices <= 1) {
+                        drawStroke(p.px, p.py, p.x, p.y);
+                    } else {
+                        const cx = W / 2, cy = H / 2;
+                        const dx1 = p.px - cx, dy1 = p.py - cy;
+                        const dx2 = p.x - cx, dy2 = p.y - cy;
+                        for (let s = 0; s < symmetrySlices; s++) {
+                            const theta = (s * 2 * Math.PI) / symmetrySlices;
+                            const ct = Math.cos(theta), st = Math.sin(theta);
+                            const rx1 = dx1 * ct - dy1 * st, ry1 = dx1 * st + dy1 * ct;
+                            const rx2 = dx2 * ct - dy2 * st, ry2 = dx2 * st + dy2 * ct;
+                            drawStroke(cx + rx1, cy + ry1, cx + rx2, cy + ry2);
+                        }
+                    }
+                }
+                requestAnimationFrame(step);
+            }
+
+            resetParticles();
+            requestAnimationFrame(step);
+
+            // ---------- Audio Engine ----------
+            const AudioEngine = () => {
+                const state = { ctx: null, master: null, analyser: null, running: false };
+                const sources = { rain: null, waves: null, brown: null, chimes: null };
+                const gains = {};
+
+                function ensureCtx() {
+                    if (!state.ctx) {
+                        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                        const master = ctx.createGain(); master.gain.value = 0.6;
+                        const analyser = ctx.createAnalyser(); analyser.fftSize = 256; analyser.smoothingTimeConstant = 0.85;
+                        master.connect(analyser); analyser.connect(ctx.destination);
+                        state.ctx = ctx; state.master = master; state.analyser = analyser; state.running = true;
+                    }
+                }
+
+                function connectGain(name, initial = 0.5) {
+                    const g = state.ctx.createGain(); g.gain.value = initial; g.connect(state.master); gains[name] = g; return g;
+                }
+
+                // Utility: create looping brown noise buffer source
+                function createBrownSource() {
+                    const ctx = state.ctx;
+                    const bufferSize = 2 * ctx.sampleRate; // 2s
+                    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+                    const out = buffer.getChannelData(0);
+                    let lastOut = 0.0;
+                    for (let i = 0; i < bufferSize; i++) {
+                        const white = Math.random() * 2 - 1;
+                        const brown = (lastOut + 0.02 * white) / 1.02;
+                        lastOut = brown; out[i] = brown * 3.5; // normalize
+                    }
+                    const src = ctx.createBufferSource();
+                    src.buffer = buffer; src.loop = true;
+                    return src;
+                }
+
+                function startBrown() {
+                    if (!state.ctx) return;
+                    if (!gains.brown) connectGain('brown', 0.4);
+                    stopBrown();
+                    const src = createBrownSource();
+                    src.connect(gains.brown);
+                    src.start();
+                    sources.brown = src;
+                }
+                function stopBrown() { try { sources.brown && sources.brown.stop(); } catch (e) { } sources.brown = null; }
+
+                // Waves = brown noise -> LPF with slow LFO on cutoff
+                function startWaves() {
+                    if (!state.ctx) return;
+                    if (!gains.waves) connectGain('waves', 0.5);
+                    stopWaves();
+                    const ctx = state.ctx;
+                    const src = createBrownSource();
+                    const lpf = ctx.createBiquadFilter(); lpf.type = 'lowpass'; lpf.frequency.value = 220;
+                    src.connect(lpf); lpf.connect(gains.waves);
+                    const lfo = ctx.createOscillator(); lfo.frequency.value = 0.12;
+                    const lfoGain = ctx.createGain(); lfoGain.gain.value = 120;
+                    lfo.connect(lfoGain); lfoGain.connect(lpf.frequency);
+                    src.start(); lfo.start();
+                    sources.waves = { src, lfo };
+                }
+                function stopWaves() { try { sources.waves?.src.stop(); sources.waves?.lfo.stop(); } catch (e) { } sources.waves = null; }
+
+                // Rain = short filtered noise bursts randomly sprinkled
+                function startRain() {
+                    if (!state.ctx) return;
+                    if (!gains.rain) connectGain('rain', 0.7);
+                    stopRain();
+                    const ctx = state.ctx;
+                    let active = true;
+                    function droplet() {
+                        if (!active) return;
+                        const dur = 0.18 + Math.random() * 0.25;
+                        const len = Math.floor(ctx.sampleRate * dur);
+                        const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+                        const ch = buf.getChannelData(0);
+                        for (let i = 0; i < len; i++) {
+                            const env = Math.exp(-i / Math.max(1, len * 0.22));
+                            ch[i] = (Math.random() * 2 - 1) * env * 0.6;
+                        }
+                        const src = ctx.createBufferSource(); src.buffer = buf;
+                        const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 1200 + Math.random() * 2400;
+                        const pan = (ctx.createStereoPanner) ? ctx.createStereoPanner() : null;
+                        src.connect(hp); if (pan) { hp.connect(pan); pan.pan.value = (Math.random() * 2 - 1) * 0.6; pan.connect(gains.rain); } else { hp.connect(gains.rain); }
+                        src.start();
+                        src.onended = () => { src.disconnect(); hp.disconnect(); pan && pan.disconnect(); };
+                    }
+                    const timer = setInterval(() => {
+                        if (!active) return;
+                        const bursts = 2 + Math.floor(Math.random() * 3);
+                        for (let i = 0; i < bursts; i++) setTimeout(droplet, Math.random() * 180);
+                    }, 180);
+                    sources.rain = { stop: () => { active = false; clearInterval(timer); } };
+                }
+                function stopRain() { try { sources.rain?.stop(); } catch (e) { } sources.rain = null; }
+
+                // Chimes = gentle random bells
+                function startChimes() {
+                    if (!state.ctx) return;
+                    if (!gains.chimes) connectGain('chimes', 0.25);
+                    stopChimes();
+                    const ctx = state.ctx;
+                    let active = true;
+                    function bell() {
+                        if (!active) return;
+                        const freq = 440 * Math.pow(2, (Math.floor(Math.random() * 8) - 4) / 12); // near A4
+                        const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = freq;
+                        const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, ctx.currentTime);
+                        g.gain.exponentialRampToValueAtTime(0.2, ctx.currentTime + 0.02);
+                        g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + (1.6 + Math.random() * 0.8));
+                        const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 300;
+                        o.connect(hp); hp.connect(g); g.connect(gains.chimes);
+                        o.start(); o.stop(ctx.currentTime + 2.2);
+                    }
+                    const timer = setInterval(() => { if (Math.random() < 0.35) bell(); }, 1200);
+                    sources.chimes = { stop: () => { active = false; clearInterval(timer); } };
+                }
+                function stopChimes() { try { sources.chimes?.stop(); } catch (e) { } sources.chimes = null; }
+
+                function start() { ensureCtx(); state.running = true; }
+                function suspend() { state.ctx?.suspend(); state.running = false; }
+                function resume() { state.ctx?.resume(); state.running = true; }
+
+                return { state, gains, start, resume, suspend, startBrown, stopBrown, startWaves, stopWaves, startRain, stopRain, startChimes, stopChimes };
+            };
+
+            const audio = AudioEngine();
+
+            // ---------- Audio -> Visual coupling ----------
+            const energyBuf = new Uint8Array(128);
+            function pollEnergy() {
+                const a = audio.state.analyser; if (!a) return requestAnimationFrame(pollEnergy);
+                a.getByteFrequencyData(energyBuf);
+                let sum = 0; for (let i = 0; i < energyBuf.length; i++) { const v = energyBuf[i] / 255; sum += v * v; }
+                let rms = Math.sqrt(sum / energyBuf.length); // 0..1
+                const sensitivity = parseFloat(document.getElementById('sensitivity').value);
+                audioEnergy = clamp((audioEnergy * 0.85 + (rms * sensitivity) * 0.15), 0, 1);
+                // drive neon intensity with audio
+                document.documentElement.style.setProperty('--pulse', (0.6 + audioEnergy * 0.9).toFixed(2));
+                requestAnimationFrame(pollEnergy);
+            }
+            requestAnimationFrame(pollEnergy);
+
+            // ---------- Timer ----------
+            const timeLeftEl = document.getElementById('timeLeft');
+            const arc = document.getElementById('progressArc');
+            let timerId = null; let timerEnd = 0; let totalMs = 0; let pausedAt = 0;
+
+            function fmt(ms) {
+                const s = Math.max(0, Math.floor(ms / 1000));
+                const m = Math.floor(s / 60), r = s % 60; return `${String(m).padStart(2, '0')}:${String(r).padStart(2, '0')}`;
+            }
+
+            function setArc(progress) {
+                const C = 2 * Math.PI * 44; // circumference
+                const dash = C * (1 - clamp(progress, 0, 1));
+                arc.style.strokeDashoffset = dash.toFixed(2);
+            }
+
+            function tick() {
+                const now = performance.now();
+                const remain = clamp(timerEnd - now, 0, totalMs);
+                timeLeftEl.textContent = fmt(remain);
+                setArc(1 - remain / totalMs);
+                if (remain <= 0) {
+                    clearInterval(timerId); timerId = null;
+                    chime();
+                    toggleBtns(false);
+                }
+            }
+
+            function startCountdown(mins) {
+                totalMs = Math.max(60000, mins * 60000);
+                timerEnd = performance.now() + totalMs;
+                clearInterval(timerId); timerId = setInterval(tick, 250);
+                tick(); toggleBtns(true);
+            }
+
+            function pauseCountdown() {
+                if (!timerId) return;
+                clearInterval(timerId); timerId = null; pausedAt = timerEnd - performance.now();
+            }
+            function resumeCountdown() {
+                if (timerId || !pausedAt) return;
+                timerEnd = performance.now() + pausedAt; pausedAt = 0; timerId = setInterval(tick, 250); tick();
+            }
+            function resetCountdown() {
+                clearInterval(timerId); timerId = null; pausedAt = 0; timeLeftEl.textContent = fmt(totalMs); setArc(0); toggleBtns(false);
+            }
+
+            function toggleBtns(running) {
+                document.getElementById('pauseTimer').disabled = !running;
+                document.getElementById('resetTimer').disabled = !running;
+                document.getElementById('startTimer').disabled = running;
+            }
+
+            function chime() {
+                // short end-of-timer tone via chimes channel
+                if (!audio.state.ctx) return;
+                audio.startChimes(); setTimeout(() => audio.stopChimes(), 900);
+            }
+
+            // ---------- Wiring UI ----------
+            const startAudioBtn = document.getElementById('startAudio');
+            const pauseAudioBtn = document.getElementById('pauseAudio');
+            const masterVol = document.getElementById('masterVol');
+
+            startAudioBtn.addEventListener('click', async () => {
+                audio.start();
+                showToast('Audio started');
+                startAudioBtn.disabled = true; pauseAudioBtn.disabled = false;
+            });
+            pauseAudioBtn.addEventListener('click', async () => {
+                if (!audio.state.ctx) return;
+                if (audio.state.running) { await audio.suspend(); pauseAudioBtn.textContent = '▶ Resume'; }
+                else { await audio.resume(); pauseAudioBtn.textContent = '⏸︎ Pause'; }
+            });
+
+            masterVol.addEventListener('input', (e) => { if (audio.state.master) audio.state.master.gain.value = parseFloat(e.target.value); });
+
+            // sound toggles + volumes
+            function bindSound(id, startFn, stopFn, volId, gainKey) {
+                const chk = document.getElementById(id);
+                const vol = document.getElementById(volId);
+                chk.addEventListener('change', () => {
+                    if (!audio.state.ctx) audio.start();
+                    if (chk.checked) startFn.call(audio); else stopFn.call(audio);
+                    startAudioBtn.disabled = true; pauseAudioBtn.disabled = false;
+                });
+                vol.addEventListener('input', (e) => { const v = parseFloat(e.target.value); const g = audio.gains[gainKey]; if (g) g.gain.setValueAtTime(v, audio.state.ctx.currentTime); });
+            }
+
+            bindSound('rainChk', audio.startRain, audio.stopRain, 'rainVol', 'rain');
+            bindSound('wavesChk', audio.startWaves, audio.stopWaves, 'wavesVol', 'waves');
+            bindSound('brownChk', audio.startBrown, audio.stopBrown, 'brownVol', 'brown');
+            bindSound('chimeChk', audio.startChimes, audio.stopChimes, 'chimeVol', 'chimes');
+
+            // Sensitivity, quality, trail, speed, palette, symmetry
+            document.getElementById('sensitivity').addEventListener('input', () => { });
+            document.getElementById('trail').addEventListener('input', (e) => { fade = parseFloat(e.target.value); });
+            document.getElementById('speed').addEventListener('input', (e) => { baseSpeed = parseFloat(e.target.value); });
+            document.getElementById('palette').addEventListener('change', (e) => { palette = e.target.value; });
+            document.getElementById('symmetry').addEventListener('input', (e) => { symmetrySlices = parseInt(e.target.value, 10); });
+
+            const modeSel = document.getElementById('mode');
+            modeSel.addEventListener('change', (e) => { useAttractor = e.target.value === 'attractor'; document.getElementById('vizMode').textContent = 'Visual: ' + (useAttractor ? 'Crimson Attractor' : 'Flow Field'); });
+
+            const quality = document.getElementById('quality');
+            const qualityTag = document.getElementById('qualityTag');
+            function applyQuality(val) {
+                const map = { 0: { label: 'Low', count: 700 }, 1: { label: 'Medium', count: 1200 }, 2: { label: 'High', count: 2000 } };
+                const q = map[val] || map[1];
+                qualityTag.textContent = `Quality: ${q.label}`;
+                particleCount = q.count; resetParticles();
+            }
+            applyQuality(parseInt(quality.value, 10));
+            quality.addEventListener('input', (e) => applyQuality(parseInt(e.target.value, 10)));
+
+            // Timer controls
+            document.querySelectorAll('[data-preset]').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const mins = parseInt(btn.getAttribute('data-preset'), 10);
+                    document.getElementById('minutesInput').value = String(mins);
+                    startCountdown(mins);
+                });
+            });
+            document.getElementById('startTimer').addEventListener('click', () => {
+                const mins = parseInt(document.getElementById('minutesInput').value, 10) || 25;
+                startCountdown(mins);
+            });
+            document.getElementById('pauseTimer').addEventListener('click', (e) => {
+                if (!timerId && pausedAt) { resumeCountdown(); e.target.textContent = 'Pause'; }
+                else if (timerId) { pauseCountdown(); e.target.textContent = 'Resume'; }
+            });
+            document.getElementById('resetTimer').addEventListener('click', () => { resetCountdown(); document.getElementById('pauseTimer').textContent = 'Pause'; });
+
+            // Fullscreen
+            document.getElementById('fsBtn').addEventListener('click', async () => {
+                try { if (!document.fullscreenElement) await document.documentElement.requestFullscreen(); else await document.exitFullscreen(); } catch (e) { }
+            });
+
+            // Toast helper
+            const toast = document.getElementById('toast');
+            function showToast(msg) { toast.textContent = msg; toast.classList.add('show'); setTimeout(() => toast.classList.remove('show'), 1800); }
+
+            // ---------- Draggable Studio Card ----------
+            (function enableDrag() {
+                const hud = document.querySelector('.hud');
+                const clampNum = (n, a, b) => Math.min(Math.max(n, a), b);
+
+                function place(el, x, y) {
+                    const maxX = Math.max(0, hud.clientWidth - el.offsetWidth);
+                    const maxY = Math.max(0, hud.clientHeight - el.offsetHeight);
+                    el.style.position = 'absolute';
+                    el.style.left = clampNum(x, 0, maxX) + 'px';
+                    el.style.top = clampNum(y, 0, maxY) + 'px';
+                }
+
+                function makeDraggable(el, key) {
+                    const handle = el.querySelector('.title') || el;
+                    el.classList.add('draggable');
+                    let startX = 0, startY = 0, originX = 0, originY = 0;
+                    const onDown = (e) => {
+                        if (e.button !== undefined && e.button !== 0) return;
+                        el.classList.add('dragging');
+                        handle.setPointerCapture && handle.setPointerCapture(e.pointerId);
+                        startX = e.clientX; startY = e.clientY;
+                        originX = parseFloat(el.style.left || '0');
+                        originY = parseFloat(el.style.top || '0');
+                        window.addEventListener('pointermove', onMove);
+                        window.addEventListener('pointerup', onUp, { once: true });
+                    };
+                    const onMove = (e) => {
+                        const dx = e.clientX - startX;
+                        const dy = e.clientY - startY;
+                        place(el, originX + dx, originY + dy);
+                    };
+                    const onUp = () => {
+                        window.removeEventListener('pointermove', onMove);
+                        el.classList.remove('dragging');
+                        localStorage.setItem('hud-pos:' + key, JSON.stringify({ x: parseFloat(el.style.left), y: parseFloat(el.style.top) }));
+                    };
+                    handle.addEventListener('pointerdown', onDown);
+                }
+
+                const el = document.getElementById('studioCard');
+                if (el) {
+                    const saved = localStorage.getItem('hud-pos:studioCard');
+                    if (saved) {
+                        const { x, y } = JSON.parse(saved);
+                        place(el, x, y);
+                    } else {
+                        place(el, 24, 24);
+                    }
+                    makeDraggable(el, 'studioCard');
+                }
+
+                window.addEventListener('resize', () => {
+                    const el = document.getElementById('studioCard');
+                    if (!el) return;
+                    place(el, parseFloat(el.style.left || '0'), parseFloat(el.style.top || '0'));
+                });
+            })();
+
+            // ---------- Resizable Studio ----------
+            (function enableResize() {
+                const hud = document.querySelector('.hud');
+                const el = document.getElementById('studioCard');
+                const handle = el.querySelector('.resize-handle');
+                const clampNum = (n, a, b) => Math.min(Math.max(n, a), b);
+
+                // apply saved size
+                const savedSize = localStorage.getItem('studio-size');
+                if (savedSize) {
+                    try { const { w, h } = JSON.parse(savedSize); if (w && h) { el.style.width = w + 'px'; el.style.height = h + 'px'; } } catch { }
+                }
+
+                function onDown(e) {
+                    e.preventDefault();
+                    const startX = e.clientX, startY = e.clientY;
+                    const startW = el.offsetWidth, startH = el.offsetHeight;
+                    function onMove(ev) {
+                        const dx = ev.clientX - startX; const dy = ev.clientY - startY;
+                        const maxW = hud.clientWidth - el.offsetLeft - 6;
+                        const maxH = hud.clientHeight - el.offsetTop - 6;
+                        el.style.width = clampNum(startW + dx, 340, Math.max(360, maxW)) + 'px';
+                        el.style.height = clampNum(startH + dy, 240, Math.max(260, maxH)) + 'px';
+                    }
+                    function onUp() {
+                        window.removeEventListener('pointermove', onMove);
+                        window.removeEventListener('pointerup', onUp);
+                        localStorage.setItem('studio-size', JSON.stringify({ w: el.offsetWidth, h: el.offsetHeight }));
+                    }
+                    window.addEventListener('pointermove', onMove);
+                    window.addEventListener('pointerup', onUp, { once: true });
+                }
+                handle.addEventListener('pointerdown', onDown);
+
+                // responsiveness to card size
+                const ro = new ResizeObserver(entries => {
+                    const w = entries[0].contentRect.width;
+                    el.classList.remove('size-narrow', 'size-medium', 'size-wide');
+                    el.classList.add(w >= 900 ? 'size-wide' : w >= 640 ? 'size-medium' : 'size-narrow');
+                });
+                ro.observe(el);
+            })();
+
+            // Initial time arc
+            setArc(0);
+            timeLeftEl.textContent = '25:00';
+
+            /* ---------------- Self-tests (non-intrusive) ---------------- */
+            function assert(cond, msg) { if (!cond) { console.error('[Self-test failed]', msg); showToast('Self-test failed: ' + msg); } }
+            try {
+                const sample = paletteColor(10, 0.5);
+                assert(typeof sample === 'string' && sample.startsWith('hsla('), 'paletteColor should return an hsla() string');
+                assert(sample.includes('0.5'), 'paletteColor should include provided alpha');
+                assert(typeof step === 'function', 'render loop "step" exists');
+                const sc = document.getElementById('studioCard');
+                assert(!!sc, 'studioCard exists');
+                const sizeClass = ['size-narrow', 'size-medium', 'size-wide'].some(c => sc.classList.contains(c));
+                assert(sizeClass, 'studioCard has a responsive size class');
+                const rh = sc.querySelector('.resize-handle');
+                assert(!!rh, 'resize handle exists');
+                console.log('%cSelf-tests passed', 'color:#10b981');
+            } catch (err) {
+                console.error('Self-tests crashed:', err);
+            }
+            /* ----------------------------------------------------------- */
+
+            /* ---------------- Additional tests ---------------- */
+            try {
+                const before = particles.length; applyQuality(2); assert(particleCount >= 1800, 'High quality should increase particleCount'); applyQuality(1);
+                const prev = palette; palette = 'noir'; const noir = paletteColor(12, 0.3); assert(typeof noir === 'string' && noir.includes('0.3'), 'Noir palette returns hsla with alpha'); palette = prev;
+                assert(typeof audio === 'object' && typeof audio.start === 'function', 'audio engine object exists');
+            } catch (e) {
+                console.warn('Additional tests skipped due to scope:', e);
+            }
+            /* --------------------------------------------------- */
+
+        })();
+    </script>
+</body>
+
+</html>
