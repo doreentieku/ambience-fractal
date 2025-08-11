@@ -32,4 +32,4 @@ Designed for focus, relaxation, and creative flow — combining audio ambience, 
   - Local storage remembers panel position and size
 
 **Demo**  
-[Vercel](https://ambience-factual.vercel.app)
+[Vercel](https://ambience-fractal.vercel.app)
