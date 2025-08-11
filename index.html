@@ -1066,11 +1066,23 @@
                 const handle = el.querySelector('.resize-handle');
                 const clampNum = (n, a, b) => Math.min(Math.max(n, a), b);
 
+                // NEW: helper to set size class synchronously and on resize events
+                function setSizeClass(w) {
+                    el.classList.remove('size-narrow', 'size-medium', 'size-wide');
+                    el.classList.add(w >= 900 ? 'size-wide' : w >= 640 ? 'size-medium' : 'size-narrow');
+                }
+
                 // apply saved size
                 const savedSize = localStorage.getItem('studio-size');
                 if (savedSize) {
-                    try { const { w, h } = JSON.parse(savedSize); if (w && h) { el.style.width = w + 'px'; el.style.height = h + 'px'; } } catch { }
+                    try {
+                        const { w, h } = JSON.parse(savedSize);
+                        if (w && h) { el.style.width = w + 'px'; el.style.height = h + 'px'; }
+                    } catch { }
                 }
+
+                // NEW: set the initial size class immediately so self-test sees it
+                setSizeClass(el.getBoundingClientRect().width || el.offsetWidth);
 
                 function onDown(e) {
                     e.preventDefault();
@@ -1096,11 +1108,11 @@
                 // responsiveness to card size
                 const ro = new ResizeObserver(entries => {
                     const w = entries[0].contentRect.width;
-                    el.classList.remove('size-narrow', 'size-medium', 'size-wide');
-                    el.classList.add(w >= 900 ? 'size-wide' : w >= 640 ? 'size-medium' : 'size-narrow');
+                    setSizeClass(w); // uses the same helper
                 });
                 ro.observe(el);
             })();
+
 
             // Initial time arc
             setArc(0);
