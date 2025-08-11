@@ -770,6 +770,58 @@
 
             const audio = AudioEngine();
 
+            // ---------- Screen Wake Lock (keep screen on while audio is running) ----------
+            let wakeLock = null;
+
+            async function requestWakeLock() {
+                try {
+                    if ('wakeLock' in navigator) {
+                        // If we already have one, do nothing
+                        if (wakeLock) return;
+                        wakeLock = await navigator.wakeLock.request('screen');
+                        wakeLock.addEventListener('release', () => {
+                            // Released by the UA or OS (e.g., screen lock); clear handle
+                            wakeLock = null;
+                            console.log('[WakeLock] released');
+                        });
+                        console.log('[WakeLock] active');
+                    } else {
+                        console.log('[WakeLock] API not supported; skipping (modern iOS/Android recommended).');
+                    }
+                } catch (err) {
+                    // Rejections can happen if not initiated by a user gesture, or other policy reasons
+                    console.warn('[WakeLock] request failed:', err);
+                    wakeLock = null;
+                }
+            }
+
+            async function releaseWakeLock() {
+                try {
+                    if (wakeLock) {
+                        await wakeLock.release();
+                    }
+                } catch (e) {
+                    // Ignore
+                } finally {
+                    wakeLock = null;
+                }
+            }
+
+            // Some browsers auto-release on visibility changes. Re-request when visible again.
+            document.addEventListener('visibilitychange', async () => {
+                if (document.visibilityState === 'visible' && audio.state.running) {
+                    await requestWakeLock();
+                }
+            });
+
+            // Re-request on orientation changes (some UAs drop locks then).
+            window.addEventListener('orientationchange', async () => {
+                if (audio.state.running) {
+                    await requestWakeLock();
+                }
+            });
+
+
             // ---------- Audio -> Visual coupling ----------
             const energyBuf = new Uint8Array(128);
             function pollEnergy() {
@@ -849,16 +901,28 @@
             const pauseAudioBtn = document.getElementById('pauseAudio');
             const masterVol = document.getElementById('masterVol');
 
+
             startAudioBtn.addEventListener('click', async () => {
                 audio.start();
+                await requestWakeLock();
                 showToast('Audio started');
-                startAudioBtn.disabled = true; pauseAudioBtn.disabled = false;
+                startAudioBtn.disabled = true;
+                pauseAudioBtn.disabled = false;
             });
+
             pauseAudioBtn.addEventListener('click', async () => {
                 if (!audio.state.ctx) return;
-                if (audio.state.running) { await audio.suspend(); pauseAudioBtn.textContent = '▶ Resume'; }
-                else { await audio.resume(); pauseAudioBtn.textContent = '⏸︎ Pause'; }
+                if (audio.state.running) {
+                    await audio.suspend();
+                    await releaseWakeLock();
+                    pauseAudioBtn.textContent = '▶ Resume';
+                } else {
+                    await audio.resume();
+                    await requestWakeLock();
+                    pauseAudioBtn.textContent = '⏸︎ Pause';
+                }
             });
+
 
             masterVol.addEventListener('input', (e) => { if (audio.state.master) audio.state.master.gain.value = parseFloat(e.target.value); });
 
@@ -866,13 +930,22 @@
             function bindSound(id, startFn, stopFn, volId, gainKey) {
                 const chk = document.getElementById(id);
                 const vol = document.getElementById(volId);
-                chk.addEventListener('change', () => {
-                    if (!audio.state.ctx) audio.start();
+                chk.addEventListener('change', async () => {
+                    if (!audio.state.ctx) {
+                        audio.start();
+                        await requestWakeLock();
+                    }
                     if (chk.checked) startFn.call(audio); else stopFn.call(audio);
-                    startAudioBtn.disabled = true; pauseAudioBtn.disabled = false;
+                    startAudioBtn.disabled = true;
+                    pauseAudioBtn.disabled = false;
                 });
-                vol.addEventListener('input', (e) => { const v = parseFloat(e.target.value); const g = audio.gains[gainKey]; if (g) g.gain.setValueAtTime(v, audio.state.ctx.currentTime); });
+                vol.addEventListener('input', (e) => {
+                    const v = parseFloat(e.target.value);
+                    const g = audio.gains[gainKey];
+                    if (g) g.gain.setValueAtTime(v, audio.state.ctx.currentTime);
+                });
             }
+
 
             bindSound('rainChk', audio.startRain, audio.stopRain, 'rainVol', 'rain');
             bindSound('wavesChk', audio.startWaves, audio.stopWaves, 'wavesVol', 'waves');
